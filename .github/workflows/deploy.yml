@@ -1,0 +1,61 @@
+# 工作流名称
+name: Deploy Ninemerlin Blog Site
+
+# 只监听 main 分支的 push 事件。有代码提交，自动运行
+on:
+  push:
+    branches: [main]
+
+# 允许 GITHUB_TOKEN 进行部署的权限配置
+# 看不懂，先这么用
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# 工作流具体内容
+jobs:
+  # 构建任务
+  build:
+    runs-on: ubuntu-latest # 在git的ubuntu服务器环境执行build任务
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 如果使用了 git commit 时间功能，需要设为 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Rspress 默认构建输出目录是 doc_build
+          path: doc_build
+
+  # 部署任务
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build # 仅在build成功后运行部署
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
